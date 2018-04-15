@@ -24,7 +24,7 @@ class LexrouteServiceProvider extends ServiceProvider
 
         $source = realpath($raw = __DIR__ . '/config/lexroute.php') ?: $raw;
         $this->publishes([$source => config_path('lexroute.php')],'lexroute.config');
-        //$this->mergeConfigFrom($source, 'lexroute');
+        (config('lexroute') !== null)?:$this->mergeConfigFrom($source, 'lexroute');
 
         /**
          * Register commands, so you may execute them using the Artisan CLI.
