@@ -1,0 +1,42 @@
+{
+    "name": "novanandriyono/lexroute",
+    "description": "Extra command route for laravel",
+    "homepage": "https://github.com/novanandriyono/lexroute",
+    "license": "MIT",
+    "keywords": [
+        "laravel",
+        "lexroute"
+    ],
+    "authors": [
+        {
+            "name": "Novan Andriyono",
+            "email": "evelynradtya@gmail.com"
+        }
+    ],
+    "require": {
+        "php": ">=5.6.4",
+        "laravel/framework": "5.6.*"
+    },
+    "autoload": {
+        "classmap": [
+            "src/"
+        ],
+        "psr-4": {
+            "Lexroute\\": "src/"
+        },
+        "files": [
+            "helpers.php"
+        ]
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Lexroute\\LexrouteServiceProvider"
+            ]
+        }
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "minimum-stability": "dev"
+}
