@@ -4,8 +4,6 @@ namespace Lexroute;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Routing\Route as BaseRoute;
-use Illuminate\Routing\RouteCollection;
 use Lexroute\Generator\Generator;
 use Lexroute\Generator\ApiRouteGenerator;
 use Lexroute\Contracts\LexrouteException;
@@ -347,6 +345,7 @@ class RouteUpdate extends Command
         }else{
             $stubs =  $this->template()."\n"."\n".implode(";\n",$this->getNewRoutes()).";\n";
         }
+        $stubs = preg_replace('/;+/', ';', $stubs);
         file_put_contents($this->oldRoutesPath,$stubs);
     }
 
@@ -418,7 +417,7 @@ class RouteUpdate extends Command
             array_pop($routes);
             $routes[] = $last;
         }
-        return $routes;
+        return $this->fixOldRoute($routes);
     }
 
     protected function getOldRoutePath(){
@@ -467,6 +466,47 @@ class RouteUpdate extends Command
             }
         }
         return array_values($folder);
+    }
+
+    protected function fixOldRoute($routes = []){
+        $items = [];
+        $laravelroutes = $this->getFreshLaravelRoute();
+        for ($i=0; $i < count($routes); $i++){
+            $pattern = "/^.*->name[\(][\']/";
+            $pattern2 = "/[\'][\)].*/";
+            $name = preg_replace([$pattern,$pattern2],null,$routes[$i]);
+            if(!isset($laravelroutes[$name])){
+                unset($routes[$i]);
+                return $this->fixOldRoute(array_values($routes));
+            }
+
+            $action = $laravelroutes[$name]->action['uses'];
+            if(is_object($action)){
+                continue;
+            }
+            list($controller,$action) = explode('@',$action);
+            if(method_exists($controller, $action) === true){
+                if(str_contains($this->config->apicontrollerpath,$this->config->controllerpath)){
+                    if($this->option('api') !== true){
+                        $replace = str_replace([$this->config->controllerpath,'/'],[null,null],$this->config->apicontrollerpath);
+                        if(str_contains($routes[$i],$replace.'\\')){
+                            unset($routes[$i]);
+                            return $this->fixOldRoute(array_values($routes));
+                        }
+                    }
+                }
+           }else{
+                unset($routes[$i]);
+                return $this->fixOldRoute(array_values($routes));
+           }
+        }
+        return array_values($routes);
+    }
+
+    protected function getFreshLaravelRoute(){
+        $collection = Route::getRoutes();
+        $collection->refreshNameLookups();
+        return $collection->getRoutesByName();
     }
 
     protected function getActionList(){
