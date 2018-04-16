@@ -17,7 +17,7 @@ class ApiRouteGenerator extends Generator implements GeneratorInterface{
             $method = $this->methodForRoute($name);
             $routers[$name] = "Route::";
             if(count($this->middleware) !== 0){
-                $routers[$name] .= "middleware(".json_encode($this->middleware).")->";
+                $routers[$name] .= "middleware('".implode("','",$this->middleware)."')->";
             }
             if(is_array($method)){
                 $routers[$name] .= "match(['".$method[0]."','".$method[1]."'],'";
