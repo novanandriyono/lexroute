@@ -7,6 +7,7 @@ Extra command route for laravel
 composer require novanandriyono/lexroute:dev-master
 ```
 
+![alt tag](https://preview.ibb.co/bAUomn/ezgif_2_bd90ed7a20b.gif "---")
 ### Update Route Web
 
 Update all list web routes 
@@ -20,15 +21,6 @@ Update one of routes
 ```
 php artisan route:update routename
 ```
-
-### Update Route Api
-
-```
-php artisan route:update -a
-```
-
-Will be update your route api file
-
 
 ### Publish Config
 
