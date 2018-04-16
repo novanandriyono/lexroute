@@ -400,7 +400,7 @@ class RouteUpdate extends Command
         $routes = file_get_contents($this->oldRoutesPath);
         $template = str_replace(["\r\n","\r","\n"],null,$this->template);
         $routes = str_replace(["\r\n","\r","\n",$template],null,$routes);
-        $routes = preg_replace(["/\s{2,}/","/[\s\t]/"], ' ', $routes);
+        $routes = preg_replace(["/\s{2,}/","/[\s\t]/","/[\;][\r\n|\r|\n]|[\;]$/"], [' ',' ',null], $routes);
         $key = '==\(^.^ )/==';
         $routes = str_replace([';Route::',';Auth::'],[$key.';Route::',$key.';Auth::'],$routes);
         $routes = explode($key.';',$routes);
@@ -408,16 +408,7 @@ class RouteUpdate extends Command
             unset($routes[0]);
             $routes = array_values($routes);
         }
-        $last = end($routes);
-        $pattern = "/->name[\(][\'].*[\'][\)][\;]/";
-        if(preg_match($pattern, $last,$match) === 1){
-            $item = $match[0];
-            $pattern = str_replace(';',null,$match[0]);
-            $last = str_replace($item,$pattern,$last);
-            array_pop($routes);
-            $routes[] = $last;
-        }
-        return $this->fixOldRoute($routes);
+       return $this->fixOldRoute($routes);
     }
 
     protected function getOldRoutePath(){
@@ -471,9 +462,13 @@ class RouteUpdate extends Command
     protected function fixOldRoute($routes = []){
         $items = [];
         $laravelroutes = $this->getFreshLaravelRoute();
+        $authroutes = [];
         for ($i=0; $i < count($routes); $i++){
+            if($routes[$i] === 'Auth::routes()'){
+                continue;
+            }
             $pattern = "/^.*->name[\(][\']/";
-            $pattern2 = "/[\'][\)].*/";
+            $pattern2 = "/[\'][\)]/";
             $name = preg_replace([$pattern,$pattern2],null,$routes[$i]);
             if(!isset($laravelroutes[$name])){
                 unset($routes[$i]);
