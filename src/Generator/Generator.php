@@ -48,7 +48,7 @@ class Generator implements GeneratorInterface
             $routers[$name] .= "'".$act."'";
             $routers[$name] .= ")";
             if(count($this->middleware) !== 0){
-            $routers[$name] .= "->middleware(".json_encode($this->middleware).")";
+            $routers[$name] .= "->middleware('".implode("','", $this->middleware)."')";
             }
             $routers[$name] .= "->name('".$name."')";
 
