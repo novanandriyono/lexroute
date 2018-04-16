@@ -115,10 +115,6 @@ class RouteUpdate extends Command
     protected function getRouteOption($route = null){
         $route = key($route);
         $results[] = "url";
-        $pattern = "->name('";
-        if(str_contains($route,$pattern)){
-            $results[] = "name";
-        }
         $pattern = "@";
         if(str_contains($route,$pattern)){
             $results[] = "callback";
@@ -155,35 +151,6 @@ class RouteUpdate extends Command
         }else{
             $this->error('exit');
         }
-    }
-
-    protected function updateByName($routes = [], $name = null, $selected = null){
-        if(count($routes) !== 1){
-            $this->error('must 1 route to be update');
-            return exit();
-        }
-        if(key($routes) !== $name){
-            $this->error('route name not match');
-            return exit();
-        }
-        $current = $this->ask('input current '.$selected);
-        $current = '\''.$current.'\'';
-        $params = $this->getRouteParams($routes);
-        $uri = '\''.$params->uri().'\'';
-        if($uri !== $current){
-            $this->error($selected.' not match');
-            return exit();
-        }
-        $new = $this->ask('input new '.$selected);
-        $new = '\''.$new.'\'';
-        $pattern = "/->name[(][\'].*[\'][)]?/";
-        $route = (string) key($routes[$name]);
-        $route =  preg_replace($pattern, null, $route);
-        $namepattern = '->name(\''.$name.'\')';
-        $route = str_replace($current,$new,$route);
-        $route = $route.$namepattern;
-        $routes[$name] = $route;
-        return $routes;
     }
 
     protected function updateByUrl($routes = [], $name = null, $selected = null){
