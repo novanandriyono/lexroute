@@ -7,7 +7,7 @@ Extra command route for laravel
 composer require novanandriyono/lexroute:dev-master
 ```
 
-![alt tag](https://preview.ibb.co/bAUomn/ezgif_2_bd90ed7a20b.gif "---")
+![alt tag](https://image.ibb.co/h5Q5XS/ezgif_2_bd90ed7a20b.gif "---")
 ### Update Route Web
 
 Update all list web routes 
