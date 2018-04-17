@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Route;
 use Lexroute\Generator\Generator;
 use Lexroute\Generator\ApiRouteGenerator;
 use Lexroute\Contracts\LexrouteException;
+use Dpscan\Support\Facades\Dpscan;
 class RouteUpdate extends Command
 {
 
@@ -454,32 +455,9 @@ class RouteUpdate extends Command
         return base_path($path);
     }
 
-    protected function getControllerList($folder=null,$next=null,$il=null){
-        if($folder === null){
-            $folder = $this->filterApi();
-        }
-        $this->files = [];
-        for ($i=0; $i < count($folder); $i++) {
-            if($next === null){
-                $isfolder = $this->controllerpath.DIRECTORY_SEPARATOR.$folder[$i];
-            }else{
-                $isfolder = $this->controllerpath.DIRECTORY_SEPARATOR.$next.DIRECTORY_SEPARATOR.$folder[$i];
-            }
-
-            if(is_file($isfolder)){
-                    $this->files[] = $isfolder;
-            }elseif(is_dir($isfolder)){
-                $newscan =  $this->fixFolder(scandir($isfolder));
-                $this->getControllerList($newscan,$folder[$i],$i);
-            }else{
-
-            }
-        }
-        return $this->files;
-    }
 
     protected function filterApi(){
-        $folder = $this->getFolder();
+        $folder = Dpscan::setdir($this->controllerpath)->all()->getfiles()->toArray();
         for ($i=0; $i < count($folder); $i++) {
             if(str_contains($this->config->apicontrollerpath,$this->config->controllerpath)){
                 if($this->option('api') !== true){
@@ -539,7 +517,7 @@ class RouteUpdate extends Command
     }
 
     protected function getActionList(){
-        $files = $this->getControllerList();
+        $files = $this->filterApi();
         $result = [];
         for ($i=0; $i < count($files); $i++) {
             $file = $files[$i];
@@ -601,19 +579,6 @@ class RouteUpdate extends Command
         unset($ff[0]);
         unset($ff[1]);
         return array_values($ff);
-    }
-
-    protected function getFolder($apppath = null){
-        if($apppath === null){
-            $apppath = $this->controllerpath;
-        }
-        if(file_exists($apppath)){
-            $apppath = $this->fixFolder(scandir($apppath));
-        }else{
-            $this->error('folder not found :'.$apppath);
-            $apppath = [];
-        }
-        return $apppath;
     }
 
     protected function getControllerPath(){
