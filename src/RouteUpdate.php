@@ -16,7 +16,7 @@ class RouteUpdate extends Command
      *
      * @var string
      */
-    protected $signature = 'route:update {name?} {--a|api} {--w|web} {--f|fresh} {--c|cache} {--i|info}';
+    protected $signature = 'route:update {name?} {--a|api} {--f|fresh} {--c|cache} {--i|info}';
 
     /**
      * The console command description.
@@ -25,7 +25,9 @@ class RouteUpdate extends Command
      */
     protected $description = 'Update route with single command \n';
 
-    protected $config,$template,$oldRoutesPath,$oldRoutes,$name,$inputtype,$fresh,$exceptions,$controllerpath,$freshRoute,$middleware,$freshLaravelRoutes;
+    protected $config,$template,$oldRoutesPath,$oldRoutes,$name,
+    $inputtype,$fresh,$exceptions,$controllerpath,$freshRoute,
+    $middleware,$freshLaravelRoutes;
 
     protected $type = ['web','api'];
 
@@ -51,15 +53,33 @@ class RouteUpdate extends Command
      */
     public function handle()
     {
-        $this->inputtype = ($this->option('api')===true)?'api':'web';
+        $this->controllerpath =  $this->getControllerPath();
+        if(is_array($this->config->frontpage) === true){
+            if(count($this->config->frontpage) === 1){
+                $frontpagename = key($this->config->frontpage);
+                if($this->argument('name') === $frontpagename){
+                $this->info('Cant edit frontpage');
+                return exit();
+                }
+            }
+        }
+        if($this->option('api') === true){
+             if(
+                ($this->controllerpath
+                    === $this->config->apicontrollerpath)
+                     === false){
+                $this->info('You cant use api update.. ');
+                $this->info('set your api path first..');
+                $this->info('to use -a');
+                return exit();
+             }
+        }
         $this->name = $this->argument('name');
-        $this->fresh = $this->option('fresh');
         $this->template = $this->template();
         $this->middleware = $this->getMiddleware();
-        $this->controllerpath =  $this->getControllerPath();
         $this->oldRoutesPath = $this->getOldRoutePath();
-        $this->freshRoute = $this->getFreshRoute();
         $this->oldRoutes = $this->getOldRoute();
+        $this->freshRoute = $this->getFreshRoute();
         $this->freshLaravelRoutes = $this->getFreshLaravelRoute();
         return $this->updateRoute();
     }
@@ -78,7 +98,9 @@ class RouteUpdate extends Command
 
     protected function setUpdate(){
         if($this->name !== null){
-            $routers = $this->updateRouteByName($this->name);
+            $routers = $this->setFrontpage(
+                $this->updateRouteByName($this->name)
+            );
             $stubs = $this->template."\n"."\n".implode(";\n",$routers).";\n";
             file_put_contents($this->oldRoutesPath,$stubs);
         }
@@ -218,7 +240,7 @@ class RouteUpdate extends Command
         $callback = $this->crToNamespace().DIRECTORY_SEPARATOR.$new;
         list($controller,$action) = explode('@',$callback);
         if(method_exists($controller, $action) === false){
-            $this->error($selected.' Unknow method');
+            $this->error( $callback .' Unknow method');
             return exit();
         }
         $route = (string) key($routes[$name]);
@@ -276,8 +298,6 @@ class RouteUpdate extends Command
             $this->error('route name not match');
             return exit();
         }
-        // $current = $this->ask('input one of method of '.$selected);
-
         $oldroute = (string) key($routes[$name]);
         $pattern = "/Route::match[\(][\[].*[\]][,]/";
         preg_match($pattern,$oldroute,$match);
@@ -376,10 +396,11 @@ class RouteUpdate extends Command
 
     protected function mergeRoute(){
         if($this->option('fresh') === true){
-            $stubs =  $this->template()."\n"."\n".implode(";\n",$this->freshRoute).";\n";
+            $items = $this->setFrontpage($this->freshRoute);
         }else{
-            $stubs =  $this->template()."\n"."\n".implode(";\n",$this->getNewRoutes()).";\n";
+            $items = $this->setFrontpage($this->getNewRoutes());
         }
+            $stubs =  $this->template()."\n"."\n".implode(";\n",$items).";\n";
         $stubs = preg_replace('/;+/', ';', $stubs);
         file_put_contents($this->oldRoutesPath,$stubs);
     }
@@ -387,8 +408,6 @@ class RouteUpdate extends Command
     protected function getNewRoutes(){
         $newroutes = array_flip(array_values($this->freshRoute));
         $oldroutes = array_flip($this->oldRoutes);
-        $this->info('last route: '. count($oldroutes));
-        $this->info('new route: '. count($newroutes));
         return $this->doMerge($newroutes, $oldroutes);
     }
 
@@ -447,21 +466,28 @@ class RouteUpdate extends Command
     }
 
     protected function getOldRoutePath(){
+        $path = $this->config->routepath;
+        $path .= DIRECTORY_SEPARATOR;
         if($this->option('api')===true){
-        $path = $this->config->routepath.DIRECTORY_SEPARATOR.$this->config->apiroute.'.php';
+        $path .= $this->config->apiroute.'.php';
         }else{
-        $path = $this->config->routepath.DIRECTORY_SEPARATOR.$this->config->webroute.'.php';
+        $path .= $this->config->webroute.'.php';
         }
         return base_path($path);
     }
 
 
     protected function filterApi(){
-        $folder = Dpscan::setdir($this->controllerpath)->all()->getfiles()->toArray();
+        $folder = Dpscan::setdir(base_path($this->controllerpath))
+        ->onlyfiles()->items()->toArray();
         for ($i=0; $i < count($folder); $i++) {
-            if(str_contains($this->config->apicontrollerpath,$this->config->controllerpath)){
+            if(str_contains($this->config->apicontrollerpath,
+                $this->config->controllerpath)){
                 if($this->option('api') !== true){
-                    $replace = str_replace([$this->config->controllerpath,'/'],[null,null],$this->config->apicontrollerpath);
+                    $replace = str_replace(
+                        [$this->config->controllerpath,'/'],
+                        [null,null],
+                        $this->config->apicontrollerpath);
                     if(str_contains($folder[$i],$replace)){
                         unset($folder[$i]);
                     }
@@ -521,7 +547,7 @@ class RouteUpdate extends Command
         $result = [];
         for ($i=0; $i < count($files); $i++) {
             $file = $files[$i];
-            $classFile = str_replace(['.php'],[null],$file);
+            $classFile = str_replace([base_path($this->controllerpath).'\\','.php'],null,$file);
             $re = '/public function.*?\(/';
             $str = file_get_contents($file);
             preg_match_all($re, $str, $matches, PREG_SET_ORDER, 0);
@@ -542,37 +568,67 @@ class RouteUpdate extends Command
     }
 
     protected function getFreshRoute(){
-        $glue = str_replace('\\','.',str_replace('/','.',$this->controllerpath));
         if($this->option('api')===true){
             $generator = new ApiRouteGenerator($this->getActionList(),$this->controllerpath,$this->middleware,$this->config->translations);
         }else{
             $generator = new Generator($this->getActionList(),$this->controllerpath,$this->middleware,$this->config->translations);
         }
         $routes = $generator->get();
+        $glue = str_replace('\\','.',str_replace('/','.',$this->controllerpath));
         $results = [];
         for ($i=0; $i < count(array_keys($routes)) ; $i++) {
             $route = str_replace('\\','.',str_replace('/','.',$routes[array_keys($routes)[$i]]));
             if(!str_contains($route,$glue)){
-                $results[] = $routes[array_keys($routes)[$i]];
+                $results[array_keys($routes)[$i]] = $routes[array_keys($routes)[$i]];
             }
         }
         return $results;
     }
 
-    protected function setFrontpage($lists){
-        $item = [];
-        $frontpagename = array_keys($this->config->frontpage);
-        $glue = $this->config->frontpage[end($frontpagename)];
-        $paternUrl = "/'\/.*?',?/";
-        if(isset($lists[$glue])){
-            $list = $lists[$glue];
-            $list = preg_replace($paternUrl, "'/',", $list);
-            $item[end($frontpagename)] = str_replace($glue , end($frontpagename),  $list);
-            return $item + $lists;
-        }else{
-            $this->info('frontpage name not found');
-            return  $lists;
+    protected function setFrontpage(array $lists = []){
+        if($this->option('api') === true){
+            $this->info('Frontpage just for web routes');
+            return $lists;
         }
+        if(is_array($this->config->frontpage) === true){
+            if(count($this->config->frontpage) === 1){
+                $frontpagename = key($this->config->frontpage);
+                $glue = $this->config->frontpage[$frontpagename];
+                if(str_contains($glue,$frontpagename) === true){
+                   $this->info('Frontpage name must be different from base name 1');
+                   return exit();
+                }
+                if(str_contains($frontpagename,$glue) === true){
+                   $this->info('Frontpage name must be different from base name 2');
+                   return exit();
+                }
+                $freshLaravelRoutes = $this->getFreshLaravelRoute();
+                if(isset($freshLaravelRoutes[$frontpagename])){
+                   $this->info('Frontpage has been set nothing to set pass');
+                   return $lists;
+                }
+                if(!isset($this->freshLaravelRoutes[$glue])){
+                   $this->info($glue. ' Unknow base router name 3');
+                   return exit();
+                }
+                $route = $freshLaravelRoutes[$glue];
+                $url = str_shuffle($frontpagename);
+                $key = ucfirst($url);
+                $keyArray = $url.'..index';
+                $action = $key.'/Controller@index';
+                $generator = new Generator([$action],$this->controllerpath,$this->middleware,$this->config->translations);
+                $list = $generator->get()[$keyArray];
+                $newaction = str_replace($route->action['namespace'].'\\',null,$route->action['uses']);
+                $item = str_replace([$url.'/',$action,$keyArray], ["/",$newaction,$frontpagename], $list);
+                if($lists[0] === 'Auth::routes()'){
+                    $authroutes[$lists[0]] = $lists[0];
+                    $lists[0] = $item;
+                    $item = $authroutes;
+                }
+                return $item + $lists;
+            }
+        }
+        return $lists;
     }
 
     protected function fixFolder($ff = []){
