@@ -32,7 +32,8 @@ class LexrouteServiceProvider extends ServiceProvider
         if($this->app->runningInConsole()) {
             $this->commands([
                 RouteUpdate::class,
-                RouteMake::class
+                RouteMake::class,
+                RouteEdit::class
             ]);
         }
 
@@ -59,6 +60,14 @@ class LexrouteServiceProvider extends ServiceProvider
             });
             $e = $app->make('Lexroute\Contracts\LexrouteException');
             $routermake = new RouteMake($e);
+            return $routermake;
+        });
+        $this->app->singleton(RouteEdit::class, function ($app) {
+            $app->bind('Lexroute\Contracts\LexrouteException',function(){
+                return new LexrouteException();
+            });
+            $e = $app->make('Lexroute\Contracts\LexrouteException');
+            $routermake = new RouteEdit($e);
             return $routermake;
         });
     }
