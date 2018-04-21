@@ -8,6 +8,7 @@ use Lexroute\Generator\Generator;
 use Lexroute\Generator\ApiRouteGenerator;
 use Lexroute\Contracts\LexrouteException;
 use Dpscan\Support\Facades\Dpscan;
+
 class RouteUpdate extends Command
 {
 
@@ -16,7 +17,7 @@ class RouteUpdate extends Command
      *
      * @var string
      */
-    protected $signature = 'route:update {name?} {--a|api} {--f|fresh} {--c|cache} {--i|info}';
+    protected $signature = 'route:update {--a|api} {--f|fresh} {--c|cache} {--i|info}';
 
     /**
      * The console command description.
@@ -26,7 +27,7 @@ class RouteUpdate extends Command
     protected $description = 'Update route with single command \n';
 
     protected $config,$template,$oldRoutesPath,$oldRoutes,$name,
-    $inputtype,$fresh,$exceptions,$controllerpath,$freshRoute,
+    $exceptions,$controllerpath,$freshRoute,
     $middleware,$freshLaravelRoutes;
 
     protected $type = ['web','api'];
@@ -54,15 +55,6 @@ class RouteUpdate extends Command
     public function handle()
     {
         $this->controllerpath =  $this->getControllerPath();
-        if(is_array($this->config->frontpage) === true){
-            if(count($this->config->frontpage) === 1){
-                $frontpagename = key($this->config->frontpage);
-                if($this->argument('name') === $frontpagename){
-                $this->info('Cant edit frontpage');
-                return exit();
-                }
-            }
-        }
         if($this->option('api') === true){
              if(
                 ($this->controllerpath
@@ -74,335 +66,32 @@ class RouteUpdate extends Command
                 return exit();
              }
         }
-        $this->name = $this->argument('name');
+        return $this->updateRoute();
+    }
+
+    protected function updateRoute(){
+        $this->mergeRoute();
+        if($this->option('cache') === true){
+            $this->call('route:cache');
+        }
+    }
+
+    protected function mergeRoute(){
         $this->template = $this->template();
         $this->middleware = $this->getMiddleware();
         $this->oldRoutesPath = $this->getOldRoutePath();
         $this->oldRoutes = $this->getOldRoute();
         $this->freshRoute = $this->getFreshRoute();
         $this->freshLaravelRoutes = $this->getFreshLaravelRoute();
-        return $this->updateRoute();
-    }
-
-    protected function updateRoute(){
-        if($this->name !== null){
-            $this->setUpdate();
-        }else{
-            $this->mergeRoute();
-        }
-
-        if($this->option('cache') === true){
-            $this->call('route:cache');
-        }
-    }
-
-    protected function setUpdate(){
-        if($this->name !== null){
-            $routers = $this->setFrontpage(
-                $this->updateRouteByName($this->name)
-            );
-            $stubs = $this->template."\n"."\n".implode(";\n",$routers).";\n";
-            file_put_contents($this->oldRoutesPath,$stubs);
-        }
-    }
-
-    protected function updateRouteByName($name=null){
-        $oldroutes = $this->oldRoutes;
-        $route = $this->getRouteByName($oldroutes,$name);
-        if(count($route) === 1){
-            $options = $this->getRouteOption($route[$name]);
-            $selected = $this->choice('choose available ', $options);
-            $newroutes = $this->setRouteByOption($route,$name,$options,$selected);
-            return $this->doMerge(array_flip($oldroutes), array_flip($newroutes));
-        }else{
-            $this->error('Route Not Found...');
-        }
-    }
-
-    protected function getRouteByName($array = [], $name = null){
-        $results = [];
-        for ($i=0; $i < count($array) ; $i++) {
-            $item = $array[$i];
-            $pattern = "->name('".$name."')";
-            if((str_contains($item,$pattern) === true)
-                && (isset($this->freshLaravelRoutes[$name]) === true))
-            {
-                $line = $item;
-                $route = $this->freshLaravelRoutes[$name];
-                $results[$name] = [$line => $route];
-            }
-        }
-        return $results;
-    }
-
-    protected function getRouteOption($route = null){
-        $route = key($route);
-        $results[] = "url";
-        $pattern = "@";
-        if(str_contains($route,$pattern)){
-            $results[] = "callback";
-        }
-        if(str_contains($route,"middleware")){
-            $results[] = "middleware";
-        }
-        $pattern = [
-            "get('",
-            "post('",
-            "put('",
-            "patch('",
-            "delete('",
-            "option('",
-            "any('"
-        ];
-        if(str_contains($route,$pattern)){
-            $results[] = "method";
-        }
-        $pattern = [
-            "match(",
-        ];
-        if(str_contains($route,$pattern)){
-            $results[] = "methodmatch";
-        }
-        return $results;
-    }
-
-    protected function setRouteByOption($routes,$name,$options,$selected){
-        if($selected !== "esc"){
-            $this->info($selected);
-            $function = 'updateBy'.ucfirst($selected);
-            return $this->$function($routes,$name,$selected);
-        }else{
-            $this->error('exit');
-        }
-    }
-
-    protected function updateByUrl($routes = [], $name = null, $selected = null){
-        if(count($routes) !== 1){
-            $this->error('must 1 route to be update');
-            return exit();
-        }
-        if(key($routes) !== $name){
-            $this->error('route name not match');
-            return exit();
-        }
-        $current = $this->ask('input current '.$selected);
-        $current = '\''.$current.'\'';
-        $params = $this->getRouteParams($routes);
-        $uri = '\''.$params->uri().'\'';
-        if($uri !== $current){
-            $this->error($selected.' not match');
-            return exit();
-        }
-        $new = $this->ask('input new '.$selected);
-        $new = '\''.$new.'\'';
-        $pattern = "/->name[(][\'].*[\'][)]?/";
-        $route = (string) key($routes[$name]);
-        $route =  preg_replace($pattern, null, $route);
-        $namepattern = '->name(\''.$name.'\')';
-        $route = str_replace($current,$new,$route);
-        $route = $route.$namepattern;
-        $routes[$name] = $route;
-        return $routes;
-    }
-
-    protected function updateByCallback($routes = [], $name = null, $selected = null){
-        if(count($routes) !== 1){
-            $this->error('must 1 route to be update');
-            return exit();
-        }
-        if(key($routes) !== $name){
-            $this->error('route name not match');
-            return exit();
-        }
-        $current = $this->ask('input current '.$selected);
-        $methodaction = explode('@',$current);
-        if(count($methodaction) !== 2){
-            $this->error($selected.' Unknow method');
-            return exit();
-        }
-        $uses = $current;
-        $current = '\''.$current.'\'';
-        $params = $this->getRouteParams($routes);
-        $cb = explode('\\',$params->action['uses']);
-        $callback = end($cb);
-        $pattern = '\''.$callback.'\'';
-        if($pattern !== $current){
-            $this->error($selected.' not match');
-            return exit();
-        }
-        $callback = $this->crToNamespace().DIRECTORY_SEPARATOR.$uses;
-        list($controller,$action) = explode('@',$callback);
-        if(method_exists($controller, $action) === false){
-            $this->error($selected.' Unknow method');
-            return exit();
-        }
-        $new = $this->ask('input new '.$selected);
-        $callback = $this->crToNamespace().DIRECTORY_SEPARATOR.$new;
-        list($controller,$action) = explode('@',$callback);
-        if(method_exists($controller, $action) === false){
-            $this->error( $callback .' Unknow method');
-            return exit();
-        }
-        $route = (string) key($routes[$name]);
-        $route = str_replace($uses, $new, $route);
-        $routes[$name] = $route;
-        $this->info($route);
-        return $routes;
-    }
-
-    protected function crToNamespace(){
-        $controller = $this->controllerpath;
-        $controller = str_replace(['/','\\'],DIRECTORY_SEPARATOR,$controller);
-        return ucfirst($controller);
-    }
-
-    protected function updateByMethod($routes = [], $name = null, $selected = null){
-        if(count($routes) !== 1){
-            $this->error('must 1 route to be update');
-            return exit();
-        }
-        if(key($routes) !== $name){
-            $this->error('route name not match');
-            return exit();
-        }
-        $current = $this->ask('input current '.$selected);
-        $params = $this->getRouteParams($routes);
-        $methods = array_flip($params->methods);
-        if(!isset($methods[strtoupper($current)])){
-            $this->error($selected.' not match');
-            return exit();
-        }
-        $new = $this->ask('input new '.$selected);
-        $verbs = array_flip($this->methods);
-        if(!isset($verbs[$new])){
-            $this->error("unknow method");
-            return exit();
-        }
-        $pattern = "/name[(][\'].*[\'][)]?/";
-        $route = (string) key($routes[$name]);
-        $route = preg_replace($pattern, null, $route);
-        $method = $new."(";
-        $route = str_replace($current."(", $method, $route);
-        $namepattern = 'name(\''.$name.'\')';
-        $route = $route.$namepattern;
-        $routes[$name] = $route;
-        return $routes;
-    }
-
-    protected function updateByMethodmatch($routes = [], $name = null, $selected = null){
-        if(count($routes) !== 1){
-            $this->error('must 1 route to be update');
-            return exit();
-        }
-        if(key($routes) !== $name){
-            $this->error('route name not match');
-            return exit();
-        }
-        $oldroute = (string) key($routes[$name]);
-        $pattern = "/Route::match[\(][\[].*[\]][,]/";
-        preg_match($pattern,$oldroute,$match);
-        $pattern = "/Route::match[\(][\[]/";
-        $method = preg_replace($pattern,null,$match[0]);
-        $method = str_replace(']',null,$method);
-        $method = explode(',',$method);
-        if(end($method)===""){
-            array_pop($method);
-        }
-        $method = implode(',',$method);
-        $this->info('old: '. $method );
-        $new = $this->nestedAsk($this->methods);
-        $new = "'".implode("','",$new)."'";
-        $this->info('new: '. $new );
-        $pattern = "/name[(][\'].*[\'][)]?/";
-        $route = preg_replace($pattern, null, $oldroute);
-        $route = str_replace($method, $new, $route);
-        $namepattern = 'name(\''.$name.'\')';
-        $route = $route.$namepattern;
-        $routes[$name] = $route;
-        return $routes;
-    }
-
-    protected function nestedAsk($key = [],$results=[]){
-        $exit = 'enter to next';
-        $key[]=$exit;
-        $results = $results;
-        if(count($key)!==0){
-            $selected = $this->ask('input => '.implode(',',$key),end($key));
-        }else{
-            if(count($results) !== 0 ){
-                return $results;
-            }
-            $this->error('Not have options to ask');
-            return exit();
-        }
-        if($selected !== $exit){
-            $results[]= $selected;
-            $ask = array_flip($key);
-            if(isset($ask[$selected])){
-                unset($ask[$selected]);
-                $ask = array_values(array_flip($ask));
-                return $this->nestedAsk($ask,$results);
-            }
-            return $results;
-        }
-        return $results;
-    }
-
-    protected function getRouteParams($array = []){
-        $array = $array[key($array)];
-        $param = key($array);
-        return $array[$param];
-    }
-
-    protected function updateByMiddleware($routes = [], $name = null, $selected = null){
-        if(count($routes) !== 1){
-            $this->error('must 1 route to be update');
-            return exit();
-        }
-        if(key($routes) !== $name){
-            $this->error('route name not match');
-            return exit();
-        }
-        $route = (string) key($routes[$name]);
-        $current = $this->ask('input current like auth,can,can '.$selected);
-        $params = $this->getRouteParams($routes);
-        $middleware = implode(',',$params->action['middleware']);
-        if($this->option('api')=== true){
-            if(!str_contains($current,'api')){
-                $pattern = 'api,'.$current;
-            }
-        }else{
-            if(!str_contains($current,'web')){
-                $pattern = 'web,'.$current;
-            }
-        }
-        if($pattern !== $middleware){
-            $this->error($route.' not match');
-            return exit();
-        }
-        $new = $this->ask('input new like auth:api,can or can,view '.$selected);
-        $new = explode(',',$new);
-        $new = "middleware('".implode("','",$new)."')";
-        $current = explode(',',$current);
-        $current = "middleware('".implode("','",$current)."')";
-        $pattern = "/name[(][\'].*[\'][)]?/";
-        $route = preg_replace($pattern, null, $route);
-        $route = str_replace($current, $new, $route);
-        $namepattern = 'name(\''.$name.'\')';
-        $route = $route.$namepattern;
-        $routes[$name] = $route;
-        return $routes;
-    }
-
-    protected function mergeRoute(){
         if($this->option('fresh') === true){
             $items = $this->setFrontpage($this->freshRoute);
         }else{
             $items = $this->setFrontpage($this->getNewRoutes());
         }
-            $stubs =  $this->template()."\n"."\n".implode(";\n",$items).";\n";
+        $stubs =  $this->template()."\n"."\n".implode(";\n",$items).";\n";
         $stubs = preg_replace('/;+/', ';', $stubs);
         file_put_contents($this->oldRoutesPath,$stubs);
+        return exit('done');
     }
 
     protected function getNewRoutes(){
@@ -415,6 +104,7 @@ class RouteUpdate extends Command
         $allroutes = array_keys($new + $old);
         $results=[];
         $auth = [];
+        $frontpage = [];
         if($this->option('info') === true){
         $hasupdate=[];
         $notupdate=[];
@@ -436,12 +126,28 @@ class RouteUpdate extends Command
                 $auth[$key] = $item;
                 unset($results[$key]);
             }
+            if(is_array($this->config->frontpage) === true){
+                if(count($this->config->frontpage) === 1){
+                    $frontpagename = key($this->config->frontpage);
+                    $glue = $this->config->frontpage[$frontpagename];
+                    if($frontpagename === $key){
+                        $frontpage[$key] = $item;
+                        unset($results[$key]);
+                    }
+                }
+            }
         }
 
-        if(count($auth)===1){
+        if(is_array($this->config->frontpage) === true){
+            if(count($this->config->frontpage) === 1){
+                 $results = $frontpage + $results;
+            }
+        }
+
+        if((count($auth)===1)){
             $results = $auth + $results;
         }
-            $results = array_values($results);
+        $results = array_values($results);
 
         if($this->option('info') === true){
             $this->info('updated route: '. count($hasupdate));
@@ -505,6 +211,9 @@ class RouteUpdate extends Command
             if($routes[$i] === 'Auth::routes()'){
                 continue;
             }
+            if($routes[$i] === 'Auth::routes()'){
+                continue;
+            }
             $pattern = "/^.*->name[\(][\']/";
             $pattern2 = "/[\'][\)]/";
             $name = preg_replace([$pattern,$pattern2],null,$routes[$i]);
@@ -518,20 +227,19 @@ class RouteUpdate extends Command
                 continue;
             }
             list($controller,$action) = explode('@',$action);
-            if(method_exists($controller, $action) === true){
-                if(str_contains($this->config->apicontrollerpath,$this->config->controllerpath)){
-                    if($this->option('api') !== true){
-                        $replace = str_replace([$this->config->controllerpath,'/'],[null,null],$this->config->apicontrollerpath);
-                        if(str_contains($routes[$i],$replace.'\\')){
-                            unset($routes[$i]);
-                            return $this->fixOldRoute(array_values($routes));
-                        }
-                    }
-                }
-           }else{
+            if(method_exists($controller, $action) === false){
                 unset($routes[$i]);
                 return $this->fixOldRoute(array_values($routes));
-           }
+            }
+            if(str_contains($this->config->apicontrollerpath,$this->config->controllerpath)){
+                if($this->option('api') !== true){
+                    $replace = str_replace([$this->config->controllerpath,'/'],[null,null],$this->config->apicontrollerpath);
+                    if(str_contains($routes[$i],$replace.'\\')){
+                        unset($routes[$i]);
+                        return $this->fixOldRoute(array_values($routes));
+                    }
+                }
+            }
         }
         return array_values($routes);
     }
@@ -569,9 +277,17 @@ class RouteUpdate extends Command
 
     protected function getFreshRoute(){
         if($this->option('api')===true){
-            $generator = new ApiRouteGenerator($this->getActionList(),$this->controllerpath,$this->middleware,$this->config->translations);
+            $generator = new ApiRouteGenerator(
+                $this->getActionList(),
+                $this->controllerpath,
+                $this->middleware,
+                $this->config->translations);
         }else{
-            $generator = new Generator($this->getActionList(),$this->controllerpath,$this->middleware,$this->config->translations);
+            $generator = new Generator(
+                $this->getActionList(),
+                $this->controllerpath,
+                $this->middleware,
+                $this->config->translations);
         }
         $routes = $generator->get();
         $glue = str_replace('\\','.',str_replace('/','.',$this->controllerpath));
@@ -625,7 +341,7 @@ class RouteUpdate extends Command
                     $lists[0] = $item;
                     $item = $authroutes;
                 }
-                return $item + $lists;
+                return $item[] = $lists;
             }
         }
         return $lists;
@@ -652,10 +368,6 @@ class RouteUpdate extends Command
         }else{
             return $this->config->middleware;
         }
-    }
-
-    protected function frontpage(){
-        return $this->config->frontpage;
     }
 
     protected function template(){
