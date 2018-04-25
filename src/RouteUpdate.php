@@ -6,8 +6,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Route;
 use Lexroute\Generator\Generator;
 use Lexroute\Generator\ApiRouteGenerator;
-use Lexroute\Contracts\LexrouteException;
-use Dpscan\Support\Facades\Dpscan;
+use Dpscan;
 
 class RouteUpdate extends Command
 {
@@ -27,8 +26,10 @@ class RouteUpdate extends Command
     protected $description = 'Update route with single command \n';
 
     protected $config,$template,$oldRoutesPath,$oldRoutes,$name,
-    $exceptions,$controllerpath,$freshRoute,
+    $exceptions,$freshRoute,
     $middleware,$freshLaravelRoutes;
+
+    protected $controllerpath = 'App\Http\Controllers';
 
     protected $type = ['web','api'];
 
@@ -54,18 +55,6 @@ class RouteUpdate extends Command
      */
     public function handle()
     {
-        $this->controllerpath =  $this->getControllerPath();
-        if($this->option('api') === true){
-             if(
-                ($this->controllerpath
-                    === $this->config->apicontrollerpath)
-                     === false){
-                $this->info('You cant use api update.. ');
-                $this->info('set your api path first..');
-                $this->info('to use -a');
-                return exit();
-             }
-        }
         return $this->updateRoute();
     }
 
@@ -77,6 +66,7 @@ class RouteUpdate extends Command
     }
 
     protected function mergeRoute(){
+        $this->controllerpath = $this->getControllerPath();
         $this->template = $this->template();
         $this->middleware = $this->getMiddleware();
         $this->oldRoutesPath = $this->getOldRoutePath();
@@ -179,28 +169,26 @@ class RouteUpdate extends Command
         }else{
         $path .= $this->config->webroute.'.php';
         }
+        if(is_file(base_path($path)) !== true){
+            $this->info('route path not found');
+            return exit();
+        }
         return base_path($path);
     }
 
 
     protected function filterApi(){
-        $folder = Dpscan::setdir(base_path($this->controllerpath))
-        ->onlyfiles()->items()->toArray();
-        for ($i=0; $i < count($folder); $i++) {
-            if(str_contains($this->config->apicontrollerpath,
-                $this->config->controllerpath)){
-                if($this->option('api') !== true){
-                    $replace = str_replace(
-                        [$this->config->controllerpath,'/'],
-                        [null,null],
-                        $this->config->apicontrollerpath);
-                    if(str_contains($folder[$i],$replace)){
-                        unset($folder[$i]);
-                    }
-                }
+        $folder = Dpscan::setdir(base_path($this->controllerpath))->onlyfiles();
+        if($this->option('api') !== true){
+            if(str_contains($this->config->apicontrollerpath,$this->controllerpath) === true){
+              $folder = $folder->notcontains([$this->config->apicontrollerpath]);
+            }
+        }else{
+            if(str_contains($this->config->apicontrollerpath,$this->controllerpath) === true){
+              $folder = $folder->contains([$this->config->apicontrollerpath]);
             }
         }
-        return array_values($folder);
+        return array_values($folder->items()->toArray());
     }
 
     protected function fixOldRoute($routes = []){
@@ -231,9 +219,9 @@ class RouteUpdate extends Command
                 unset($routes[$i]);
                 return $this->fixOldRoute(array_values($routes));
             }
-            if(str_contains($this->config->apicontrollerpath,$this->config->controllerpath)){
+            if(str_contains($this->config->apicontrollerpath,$this->controllerpath)){
                 if($this->option('api') !== true){
-                    $replace = str_replace([$this->config->controllerpath,'/'],[null,null],$this->config->apicontrollerpath);
+                    $replace = str_replace([$this->controllerpath,'/'],[null,null],$this->config->apicontrollerpath);
                     if(str_contains($routes[$i],$replace.'\\')){
                         unset($routes[$i]);
                         return $this->fixOldRoute(array_values($routes));
@@ -261,7 +249,7 @@ class RouteUpdate extends Command
             preg_match_all($re, $str, $matches, PREG_SET_ORDER, 0);
             foreach ($matches as $key => $value) {
                 foreach ($value as $k => $v) {
-                    if (strpos($v, '__construct') === false) {
+                    if (strpos($v, '__') === false) {
                         $val = str_replace(['public function ','('],[$classFile.'@',null],$v);
                         if(strpos($val, 'public function.*?') === false){
                             if(strpos($val, ',') === false){
@@ -276,20 +264,16 @@ class RouteUpdate extends Command
     }
 
     protected function getFreshRoute(){
+        $generator = new Generator(
+            $this->getActionList(),
+            $this->controllerpath,
+            $this->middleware,
+            $this->config->translations);
         if($this->option('api')===true){
-            $generator = new ApiRouteGenerator(
-                $this->getActionList(),
-                $this->controllerpath,
-                $this->middleware,
-                $this->config->translations);
+            $routes = $generator->api();
         }else{
-            $generator = new Generator(
-                $this->getActionList(),
-                $this->controllerpath,
-                $this->middleware,
-                $this->config->translations);
+            $routes = $generator->web();
         }
-        $routes = $generator->get();
         $glue = str_replace('\\','.',str_replace('/','.',$this->controllerpath));
         $results = [];
         for ($i=0; $i < count(array_keys($routes)) ; $i++) {
@@ -354,12 +338,24 @@ class RouteUpdate extends Command
     }
 
     protected function getControllerPath(){
-        if($this->option('api') === true){
-            $path = $this->config->apicontrollerpath;
-        }else{
-            $path = $this->config->controllerpath;
+        if($this->config->controllerpath !== false){
+          $this->controllerpath = $this->config->controllerpath;
         }
-        return $path;
+        if($this->option('api') === true){
+            if(str_contains($this->config->apicontrollerpath,$this->controllerpath) === true){
+                return $this->controllerpath;
+            }
+            if($this->config->apicontrollerpath !== false){
+                return $this->controllerpath;
+            }else{
+                $this->info('You cant use api update.. ');
+                $this->info('set your api path first..');
+                $this->info('to use -a');
+                return exit();
+            }
+        }else{
+            return $this->controllerpath;
+        }
     }
 
     protected function getMiddleware(){
