@@ -1,5 +1,25 @@
 language: php
-php:
-  - 7.1.9
-  - hhvm-3.18
-  - hhvm-nightly
+
+env:
+  global:
+    - setup=stable
+
+matrix:
+  fast_finish: true
+  include:
+    - php: 7.1
+    - php: 7.2
+
+sudo: false
+
+before_script:
+    - composer self-update
+    - composer update --no-interaction --prefer-source
+
+before_install:
+  - curl -sSfL -o ~/.phpenv/versions/hhvm/bin/phpunit https://phar.phpunit.de/phpunit-5.7.phar
+  - travis_retry composer self-update
+
+script: "phpunit tests"
+
+sudo: false
