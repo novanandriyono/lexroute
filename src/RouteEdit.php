@@ -5,7 +5,7 @@ namespace Lexroute;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Route;
 use Lexroute\Contracts\LexrouteException;
-use Dpscan\Support\Facades\Dpscan;
+use Dpscan;
 
 class RouteEdit extends Command
 {
@@ -15,17 +15,19 @@ class RouteEdit extends Command
      *
      * @var string
      */
-    protected $signature = 'route:edit {name?} {--a|api} {--f|fresh} {--c|cache} {--i|info}';
+    protected $signature = 'route:edit {name?} {--a|api} {--c|cache} {--i|info}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Edit route with single command \n';
+    protected $description = 'Edit route with single command';
 
     protected $config,$template,$oldRoutesPath,$oldRoutes,$name,
-    $exceptions,$controllerpath,$freshLaravelRoutes;
+    $exceptions,$freshLaravelRoutes;
+
+    protected $controllerpath = 'App\Http\Controllers';
 
     protected $type = ['web','api'];
 
@@ -60,17 +62,6 @@ class RouteEdit extends Command
                 return exit();
                 }
             }
-        }
-        if($this->option('api') === true){
-             if(
-                ($this->controllerpath
-                    === $this->config->apicontrollerpath)
-                     === false){
-                $this->info('You cant use api update..');
-                $this->info('set your api path first..');
-                $this->info('to use -a');
-                return exit();
-             }
         }
         $this->name = $this->argument('name');
         $this->template = $this->template();
@@ -128,7 +119,7 @@ class RouteEdit extends Command
             $results[] = "callback";
         }
         if(str_contains($route,"middleware")){
-            $results[] = "middleware";
+            $results[] = "->middleware(";
         }
         $pattern = [
             "get('",
@@ -450,20 +441,21 @@ class RouteEdit extends Command
                 continue;
             }
             list($controller,$action) = explode('@',$action);
-            if(method_exists($controller, $action) === true){
-                if(str_contains($this->config->apicontrollerpath,$this->config->controllerpath)){
+            if(method_exists($controller, $action) === false){
+                unset($routes[$i]);
+                return $this->fixOldRoute(array_values($routes));
+            }
+            if($this->config->apicontrollerpath !== $this->controllerpath){
+                if(str_contains($this->config->apicontrollerpath,$this->controllerpath)){
                     if($this->option('api') !== true){
-                        $replace = str_replace([$this->config->controllerpath,'/'],[null,null],$this->config->apicontrollerpath);
+                        $replace = str_replace([$this->controllerpath,'/'],[null,null],$this->config->apicontrollerpath);
                         if(str_contains($routes[$i],$replace.'\\')){
                             unset($routes[$i]);
                             return $this->fixOldRoute(array_values($routes));
                         }
                     }
                 }
-           }else{
-                unset($routes[$i]);
-                return $this->fixOldRoute(array_values($routes));
-           }
+            }
         }
         return array_values($routes);
     }
@@ -474,11 +466,24 @@ class RouteEdit extends Command
         return (array) $collection->getRoutesByName();
     }
 
-    protected function getControllerPath(){
+     protected function getControllerPath(){
+        if($this->config->controllerpath !== false){
+          $this->controllerpath = $this->config->controllerpath;
+        }
         if($this->option('api') === true){
-            return $this->config->apicontrollerpath;
+            if(str_contains($this->config->apicontrollerpath,$this->controllerpath) === true){
+                return $this->controllerpath;
+            }
+            if($this->config->apicontrollerpath !== false){
+                return $this->controllerpath;
+            }else{
+                $this->info('You cant use api update.. ');
+                $this->info('set your api path first..');
+                $this->info('to use -a');
+                return exit();
+            }
         }else{
-            return $this->config->controllerpath;
+            return $this->controllerpath;
         }
     }
 
