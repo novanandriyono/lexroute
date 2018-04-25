@@ -15,11 +15,16 @@ class Generator implements GeneratorInterface
 		$this->translations = $translations;
 	}
 
-	public function get(){
-		return $this->generator();
+	public function web(){
+		return $this->webgenerator();
 	}
 
-	protected function generator(){
+    public function api(){
+        $generator = new ApiRouteGenerator($this->lists,$this->controllerpath,$this->middleware);
+        return $generator->api();
+    }
+
+	protected function webgenerator(){
         $lists = $this->lists;
         $controllerpath = $this->controllerpath;
         $routers = [];
@@ -55,6 +60,7 @@ class Generator implements GeneratorInterface
         }
         return $routers;
     }
+
 
     protected function uriForRoute($action){
         $replace = [
@@ -234,8 +240,8 @@ class Generator implements GeneratorInterface
 		$firstpath = $paths[0];
 		for ($i=0; $i < count($paths); $i++) { 
 			$path = $paths[$i];
-			if($path !== $firstpath){
-				if(str_contains($path,$firstpath)){
+            if($path !== $firstpath){
+                if(str_contains($path,$firstpath) === true){
 					$paths[$i] = str_replace($firstpath,null,$path);
 				}
 			}
