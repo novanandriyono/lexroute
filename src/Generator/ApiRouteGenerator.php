@@ -1,11 +1,15 @@
 <?php
 namespace Lexroute\Generator;
 use Lexroute\Contracts\Generator\Generator as GeneratorInterface;
-class ApiRouteGenerator extends Generator implements GeneratorInterface{
+class ApiRouteGenerator extends Generator{
 
 	protected $lists,$controllerpath,$middleware;
 
-	protected function generator(){
+	public function api(){
+        return $this->generator();
+    }
+
+    protected function generator(){
         $lists = $this->lists;
         $controllerpath = $this->controllerpath;
         $routers = [];
@@ -38,24 +42,23 @@ class ApiRouteGenerator extends Generator implements GeneratorInterface{
     protected function actionForRoute($action){
         $pattern = $this->newdash($this->removeLastPath($this->controllerpath));
         $action = $this->newdash($action);
-        $action = str_replace($pattern,null,$action);
-        $action = explode('/',$action);
-        array_shift($action);
-        return implode(DIRECTORY_SEPARATOR,$action);
+        $action = str_replace([$pattern,'/'],['null',DIRECTORY_SEPARATOR],$action);
+        return $action;
     }
 
     protected function uriForRoute($action){
-        $action = strtolower($action);
-        $lastpath = strtolower($this->getlastPath($this->controllerpath));
-        $action = str_replace(strtolower($this->controllerpath),null,$action);
-        $action = str_replace($lastpath,null,$action);
-        return parent::uriForRoute($action);
+        $action = parent::uriForRoute($action);
+        $part = explode('/',$action);
+        if(str_contains($action,$part[0])===true){
+            $action = str_replace($part[0],null,$action);
+        }
+        return $action;
     }
 
     protected function nameForRoute($action){
         $lastpath = strtolower($this->getlastPath($this->controllerpath));
         $name = strtolower($this->getlastPath($this->controllerpath));
         $name = str_replace($lastpath,null,$name);
-        return $lastpath.'.'.parent::nameForRoute($action);
+        return parent::nameForRoute($action);
     }
 }
