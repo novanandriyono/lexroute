@@ -13,15 +13,18 @@ class LexrouteException extends Exception implements BaseLexrouteException
 
   	protected function setError(){
   		try{
-            if(app()->runningInConsole() !== true || isset($_SERVER['SERVER_NAME'])){
-              if(\App::environment('local') !== true){
-                $message = " must be run in local";
-              }
-              $message = "app must be run in console";
-            }
-            if(isset($message)){
-              throw new LexrouteException($message);
-            }
+          if(app()->runningInConsole() !== true){
+            $message = 'app must be run in artisan console';
+          }
+          if(isset($_SERVER['SERVER_NAME']) === true){
+            $message = 'app must be run in artisan console';
+          }
+          if(\App::environment('local') !== true){
+            $message = "app must be run in local env";
+          }
+          if(isset($message) === true){
+            throw new LexrouteException($message);
+          }
         }
         catch(LexrouteException $e) {
 	  		 if(app()->runningInConsole() !== true){
@@ -29,6 +32,4 @@ class LexrouteException extends Exception implements BaseLexrouteException
          }
         }
   	}
-
-
 }

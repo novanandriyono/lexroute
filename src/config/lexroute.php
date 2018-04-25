@@ -5,6 +5,8 @@ return [
     |--------------------------------------------------------------------------
     | Lexroute setting
     |--------------------------------------------------------------------------
+    | Updating settng will not change old route. with command route:update
+    |
     */
 
     /*
@@ -29,10 +31,7 @@ return [
     |
     */
 
-    'middleware' => [
-        'auth',
-        'can'
-    ],
+    'middleware' => [],
 
     /*
     |--------------------------------------------------------------------------
@@ -44,9 +43,7 @@ return [
     |
     */
 
-    'apimiddleware' => [
-        'auth:api'
-    ],
+    'apimiddleware' => [],
 
     /*
     |--------------------------------------------------------------------------
@@ -54,23 +51,23 @@ return [
     |--------------------------------------------------------------------------
     |
     | Set your middleware for all route.
-    | You can disable it with "[]",
+    | You can disable it with 0,
     |
     */
 
-    'restore' => 10,
+    'restore' => 0,
 
     /*
     |--------------------------------------------------------------------------
     | Controller Path
     |--------------------------------------------------------------------------
     |
-    | Set your middleware for all route.
-    | You can disable it with "[]",
+    | This namespace is applied to your controller routes. by default we use
+    | from RouteServiceProvider, You can disable it with false
     |
     */
 
-    'controllerpath' => 'app/Http/Controllers',
+    'controllerpath' => false,
 
     /*
     |--------------------------------------------------------------------------
@@ -101,12 +98,15 @@ return [
     | Api Controller Path
     |--------------------------------------------------------------------------
     |
-    | Set your middleware for all route.
-    | You can disable it with "[]",
+    | Set our namescpace for api route. from this point we will break
+    | api and web route. creating api must at same directory. like
+    | App\Http\Controllers\Child or App\Http\Controllers\Api or
+    | App\Http\ApiControllers if we have different RouteServiceProvider for
+    | api, You can disable it with false, if disable we can use command -a
     |
     */
 
-    'apicontrollerpath' => 'app/Http/Controllers/Api',
+    'apicontrollerpath' => false,
 
     /*
     |--------------------------------------------------------------------------
