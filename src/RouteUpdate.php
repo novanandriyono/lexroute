@@ -6,7 +6,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Route;
 use Lexroute\Generator\Generator;
 use Lexroute\Generator\ApiRouteGenerator;
-use Dpscan;
+use Dpscan\Dpscan;
 
 class RouteUpdate extends Command
 {
@@ -178,7 +178,8 @@ class RouteUpdate extends Command
 
 
     protected function filterApi(){
-        $folder = Dpscan::setdir(base_path($this->controllerpath))->onlyfiles();
+        $folder = new Dpscan;
+        $folder = $folder->setdir(base_path($this->controllerpath))->onlyfiles();
         if($this->option('api') !== true){
             if(str_contains($this->config->apicontrollerpath,$this->controllerpath) === true){
               $folder = $folder->notcontains([$this->config->apicontrollerpath]);
@@ -188,7 +189,7 @@ class RouteUpdate extends Command
               $folder = $folder->contains([$this->config->apicontrollerpath]);
             }
         }
-        return array_values($folder->items()->toArray());
+        return array_values($folder->items());
     }
 
     protected function fixOldRoute($routes = []){
