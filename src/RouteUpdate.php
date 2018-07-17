@@ -179,7 +179,7 @@ class RouteUpdate extends Command
 
     protected function filterApi(){
         $folder = new Dpscan;
-        $folder = $folder->setdir(base_path($this->controllerpath))->onlyfiles();
+        $folder = $folder->setdir(base_path($this->controllerpath))->all()->onlyfiles();
         if($this->option('api') !== true){
             if(str_contains($this->config->apicontrollerpath,$this->controllerpath) === true){
               $folder = $folder->notcontains([$this->config->apicontrollerpath]);
@@ -318,15 +318,16 @@ class RouteUpdate extends Command
                 $keyArray = $url.'..index';
                 $action = $key.'/Controller@index';
                 $generator = new Generator([$action],$this->controllerpath,$this->middleware,$this->config->translations);
-                $list = $generator->get()[$keyArray];
+                $list = $generator->web()[$keyArray];
                 $newaction = str_replace($route->action['namespace'].'\\',null,$route->action['uses']);
                 $item = str_replace([$url.'/',$action,$keyArray], ["/",$newaction,$frontpagename], $list);
-                if($lists[0] === 'Auth::routes()'){
-                    $authroutes[$lists[0]] = $lists[0];
-                    $lists[0] = $item;
-                    $item = $authroutes;
+                $lists = array_merge([$item],$lists);
+                $cauth = array_flip($lists);
+                if(isset($cauth['Auth::routes()']) === true){
+                    unset($lists[$cauth['Auth::routes()']]);
+                    $lists = array_merge(['Auth::routes()'],$lists);
                 }
-                return $item[] = $lists;
+                return array_values($lists);
             }
         }
         return $lists;
